@@ -143,6 +143,7 @@ pub fn run() {
             commands::replicon_set_password,
             commands::replicon_has_password,
             commands::replicon_test_connection,
+            commands::replicon_sync_timecodes,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Bletchley");

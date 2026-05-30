@@ -20,6 +20,7 @@ Replicon wants `Client → Project → Task` with hours per day, which is painfu
 - **Weekly grid** with rollup cells (sum per code/day, click to expand and edit the individual entries), row/day/grand totals, and under-target days flagged.
 - **Capture-now, resolve-later**: log with a blank timecode; it lands in a "needs timecode" tray (also badged in the header) to assign later.
 - **Timecode manager** with an `active` flag (retire codes without losing old entries).
+- **Replicon timecode sync** (read-only): pulls your bookable `Client / Project / Task` list straight from the Replicon Gen3 API so the typeahead matches what Replicon will actually accept. Replicon stays the source of truth; the password lives in the OS keychain, and writing hours back stays disabled.
 - **Live totals** strip (today + week vs target) and a **status bar** (version, theme toggle, update pill).
 - **Global hotkey + tray icon + mini quick-add window** — pop a compact capture box from any app.
 - **Settings**: configurable daily target, theme (auto / light / dark), end-of-day reminder, hotkey.
@@ -49,7 +50,7 @@ Producing a signed installer locally needs the updater signing key in your envir
 
 ## Where the data lives
 
-A single SQLite file, `timesheet.db`, in your OS app-data dir (Windows: `%APPDATA%\com.callum.timesheet`). Daily backups sit alongside in `backups/`. The DB is seeded with starter timecodes on first run — edit them in **Manage codes**.
+A single SQLite file, `timesheet.db`, in your OS app-data dir (Windows: `%APPDATA%\com.callum.timesheet`). Daily backups sit alongside in `backups/`. Timecodes are synced from Replicon (**Settings → Sync timecodes**); you can also add ad-hoc ones in **Manage codes**.
 
 The bundle identifier (`com.callum.timesheet`) and the GitHub repo name are deliberately neutral and kept stable: the display name can change without breaking updates or moving your data.
 
@@ -88,12 +89,12 @@ src-tauri/                   Rust backend (Tauri 2)
 .github/workflows/release.yml  tag-triggered build → sign → draft release
 ```
 
-The frontend talks to the backend only through `invoke()` (the `api/` wrappers), so the data layer stays isolated — which keeps the door open for the parked stretch goal of Replicon browser-autofill without touching the UI.
+The frontend talks to the backend only through `invoke()` (the `api/` wrappers), so the data layer stays isolated. Replicon integration is read-only today (timecode sync); writing hours back is the next gated step.
 
 ### Data model
 
 ```
-timecode(id, client, project, task, active)
+timecode(id, client, project, task, active, source, replicon_client_uri, replicon_project_uri, replicon_task_uri)
 time_entry(id, timecode_id?, date, duration_minutes, description, created_at)
 ```
 

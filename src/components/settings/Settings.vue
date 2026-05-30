@@ -90,15 +90,18 @@ async function savePassword() {
   rOk.value = true;
   rBody.value = "";
 }
+async function persistReplFields() {
+  // The backend reads these straight from the settings table, so flush the
+  // current field values before any call (they may not have been blurred).
+  await store.saveSetting("replicon_base_url", rBaseUrl.value.trim());
+  await store.saveSetting("replicon_company", rCompany.value.trim());
+  await store.saveSetting("replicon_username", rUsername.value.trim());
+}
 async function testRepl() {
   rTesting.value = true;
   rMsg.value = "";
   rBody.value = "";
-  // Persist the current field values first — they may not have been blurred,
-  // and the backend reads them straight from the settings table.
-  await store.saveSetting("replicon_base_url", rBaseUrl.value.trim());
-  await store.saveSetting("replicon_company", rCompany.value.trim());
-  await store.saveSetting("replicon_username", rUsername.value.trim());
+  await persistReplFields();
   try {
     const res = await api.repliconTestConnection();
     rOk.value = res.ok;
@@ -109,6 +112,25 @@ async function testRepl() {
     rMsg.value = String(e);
   } finally {
     rTesting.value = false;
+  }
+}
+
+const rSyncing = ref(false);
+async function syncRepl() {
+  rSyncing.value = true;
+  rMsg.value = "";
+  rBody.value = "";
+  await persistReplFields();
+  try {
+    const res = await api.repliconSyncTimecodes();
+    rOk.value = res.ok;
+    rMsg.value = res.message;
+    if (res.ok) await store.loadTimecodes();
+  } catch (e) {
+    rOk.value = false;
+    rMsg.value = String(e);
+  } finally {
+    rSyncing.value = false;
   }
 }
 onMounted(async () => {
@@ -142,15 +164,19 @@ onMounted(async () => {
           </div>
           <div class="repl-actions">
             <button @click="savePassword">Save password</button>
-            <button @click="testRepl" :disabled="rTesting">
+            <button @click="testRepl" :disabled="rTesting || rSyncing">
               {{ rTesting ? "Testing…" : "Test connection" }}
+            </button>
+            <button @click="syncRepl" :disabled="rSyncing || rTesting">
+              {{ rSyncing ? "Syncing…" : "Sync timecodes" }}
             </button>
           </div>
           <p v-if="rMsg" class="note" :class="{ 'ok-note': rOk }">{{ rMsg }}</p>
           <pre v-if="rBody" class="repl-body mono">{{ rBody }}</pre>
           <p class="note">
-            Password lives in your OS keychain, never the database. Read-only for now
-            (used to sync timecodes) — writing hours stays disabled until you enable it.
+            Password lives in your OS keychain, never the database. <strong>Sync timecodes</strong>
+            pulls your bookable Client / Project / Task list from Replicon (read-only) — writing
+            hours back stays disabled until you enable it.
           </p>
         </div>
 

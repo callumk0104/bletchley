@@ -45,7 +45,7 @@ pub fn init(path: &Path) -> rusqlite::Result<Connection> {
     )?;
 
     migrate(&conn)?;
-    seed_if_empty(&conn)?;
+    purge_seed_timecodes(&conn)?;
     seed_default_settings(&conn)?;
     Ok(conn)
 }
@@ -101,53 +101,21 @@ fn seed_default_settings(conn: &Connection) -> rusqlite::Result<()> {
     Ok(())
 }
 
-/// Hand-maintained seed data. Replicon has no export, so the timecode tree
-/// lives locally; this gives a realistic starting set to type against.
-/// ~10 clients, a couple of projects each, tasks fanning out per project.
-fn seed_if_empty(conn: &Connection) -> rusqlite::Result<()> {
-    let count: i64 = conn.query_row("SELECT COUNT(*) FROM timecode", [], |r| r.get(0))?;
-    if count > 0 {
+/// One-time removal of the original hand-seeded placeholder timecodes, now that
+/// Replicon sync provides the real ones. Guarded by a setting so it runs once;
+/// any time entries attached to a removed code fall back to the unresolved tray
+/// (the timecode FK is ON DELETE SET NULL).
+fn purge_seed_timecodes(conn: &Connection) -> rusqlite::Result<()> {
+    let already = conn
+        .query_row("SELECT 1 FROM setting WHERE key = 'seed_purged'", [], |_| Ok(()))
+        .is_ok();
+    if already {
         return Ok(());
     }
-
-    // (client, project, task)
-    let seed: &[(&str, &str, &str)] = &[
-        ("William Smith", "Chevron Kits", "QA"),
-        ("William Smith", "Chevron Kits", "Frontend"),
-        ("William Smith", "Chevron Kits", "Backend"),
-        ("William Smith", "Chevron Kits", "Standups"),
-        ("William Smith", "Atlas Migration", "Data modelling"),
-        ("William Smith", "Atlas Migration", "ETL"),
-        ("Northwind Trading", "Ledger Revamp", "Discovery"),
-        ("Northwind Trading", "Ledger Revamp", "Implementation"),
-        ("Northwind Trading", "Ledger Revamp", "Code review"),
-        ("Northwind Trading", "Mobile App", "iOS"),
-        ("Northwind Trading", "Mobile App", "Android"),
-        ("Acme Logistics", "Route Optimiser", "Algorithm"),
-        ("Acme Logistics", "Route Optimiser", "Testing"),
-        ("Acme Logistics", "Warehouse Portal", "Frontend"),
-        ("Globex", "Billing Platform", "API design"),
-        ("Globex", "Billing Platform", "Integration"),
-        ("Globex", "Billing Platform", "Support"),
-        ("Initech", "TPS Reporting", "Reports"),
-        ("Initech", "TPS Reporting", "Maintenance"),
-        ("Umbrella Health", "Patient Records", "Compliance"),
-        ("Umbrella Health", "Patient Records", "Backend"),
-        ("Hooli", "Search Revamp", "Indexing"),
-        ("Hooli", "Search Revamp", "Relevance tuning"),
-        ("Wayne Enterprises", "Security Audit", "Pen testing"),
-        ("Wayne Enterprises", "Security Audit", "Remediation"),
-        ("Stark Industries", "Telemetry", "Pipeline"),
-        ("Stark Industries", "Telemetry", "Dashboards"),
-        ("Soylent Corp", "Internal", "Admin"),
-        ("Soylent Corp", "Internal", "Training"),
-        ("Soylent Corp", "Internal", "Leave"),
-    ];
-
-    let mut stmt =
-        conn.prepare("INSERT INTO timecode (client, project, task, active) VALUES (?1, ?2, ?3, 1)")?;
-    for (client, project, task) in seed {
-        stmt.execute([client, project, task])?;
-    }
+    conn.execute("DELETE FROM timecode WHERE source = 'local'", [])?;
+    conn.execute(
+        "INSERT OR REPLACE INTO setting (key, value) VALUES ('seed_purged', '1')",
+        [],
+    )?;
     Ok(())
 }
