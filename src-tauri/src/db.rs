@@ -16,6 +16,12 @@ pub fn init(path: &Path) -> rusqlite::Result<Connection> {
             project TEXT NOT NULL,
             task    TEXT NOT NULL,
             active  INTEGER NOT NULL DEFAULT 1,
+            -- 'local' = hand-added, 'replicon' = synced from Replicon
+            source  TEXT NOT NULL DEFAULT 'local',
+            billing TEXT,
+            replicon_client_uri  TEXT,
+            replicon_project_uri TEXT,
+            replicon_task_uri    TEXT,
             UNIQUE(client, project, task)
         );
 
@@ -38,9 +44,44 @@ pub fn init(path: &Path) -> rusqlite::Result<Connection> {
         "#,
     )?;
 
+    migrate(&conn)?;
     seed_if_empty(&conn)?;
     seed_default_settings(&conn)?;
     Ok(conn)
+}
+
+/// Idempotent column additions for databases created before the Replicon
+/// fields existed. SQLite's ALTER TABLE ADD COLUMN is a no-op-safe forward
+/// migration as long as we only add columns that aren't already present.
+fn migrate(conn: &Connection) -> rusqlite::Result<()> {
+    let additions: &[(&str, &str)] = &[
+        ("source", "source TEXT NOT NULL DEFAULT 'local'"),
+        ("billing", "billing TEXT"),
+        ("replicon_client_uri", "replicon_client_uri TEXT"),
+        ("replicon_project_uri", "replicon_project_uri TEXT"),
+        ("replicon_task_uri", "replicon_task_uri TEXT"),
+    ];
+    for (name, decl) in additions {
+        if !column_exists(conn, "timecode", name)? {
+            conn.execute(&format!("ALTER TABLE timecode ADD COLUMN {decl}"), [])?;
+        }
+    }
+    // Natural key for syncing: a Replicon timecode is a (project, task) pair.
+    conn.execute_batch(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_timecode_replicon          ON timecode(replicon_project_uri, replicon_task_uri)          WHERE replicon_project_uri IS NOT NULL;",
+    )?;
+    Ok(())
+}
+
+fn column_exists(conn: &Connection, table: &str, column: &str) -> rusqlite::Result<bool> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+    let names = stmt.query_map([], |r| r.get::<_, String>(1))?;
+    for n in names {
+        if n? == column {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// Insert default settings without clobbering anything the user has changed.
