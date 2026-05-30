@@ -40,6 +40,16 @@ fn toggle_quick(app: &tauri::AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Must be the first plugin: if a second copy of Bletchley is launched,
+        // focus the running window instead of starting a clashing process
+        // (which is what caused the global-hotkey "already registered" error).
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -130,6 +140,9 @@ pub fn run() {
             commands::backup_now,
             commands::backups_path,
             commands::update_tray,
+            commands::replicon_set_password,
+            commands::replicon_has_password,
+            commands::replicon_test_connection,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Bletchley");

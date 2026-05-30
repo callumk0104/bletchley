@@ -68,6 +68,56 @@ async function backupNow() {
     backupMsg.value = "Backup failed: " + e;
   }
 }
+
+// --- Replicon connection (Phase 1: read-only) ---
+const rBaseUrl = ref(store.settings.replicon_base_url || "https://eu1.replicon.com");
+const rCompany = ref(store.settings.replicon_company || "");
+const rUsername = ref(store.settings.replicon_username || "");
+const rPassword = ref("");
+const rHasPw = ref(false);
+const rTesting = ref(false);
+const rMsg = ref("");
+const rOk = ref(false);
+const rBody = ref("");
+function saveR(key, val) {
+  store.saveSetting(key, (val || "").trim());
+}
+async function savePassword() {
+  await api.repliconSetPassword(rPassword.value);
+  rHasPw.value = rPassword.value.length > 0;
+  rPassword.value = "";
+  rMsg.value = "Password saved to your OS keychain.";
+  rOk.value = true;
+  rBody.value = "";
+}
+async function testRepl() {
+  rTesting.value = true;
+  rMsg.value = "";
+  rBody.value = "";
+  // Persist the current field values first — they may not have been blurred,
+  // and the backend reads them straight from the settings table.
+  await store.saveSetting("replicon_base_url", rBaseUrl.value.trim());
+  await store.saveSetting("replicon_company", rCompany.value.trim());
+  await store.saveSetting("replicon_username", rUsername.value.trim());
+  try {
+    const res = await api.repliconTestConnection();
+    rOk.value = res.ok;
+    rMsg.value = res.message + (res.status ? `  (HTTP ${res.status})` : "");
+    rBody.value = res.body || "";
+  } catch (e) {
+    rOk.value = false;
+    rMsg.value = String(e);
+  } finally {
+    rTesting.value = false;
+  }
+}
+onMounted(async () => {
+  try {
+    rHasPw.value = await api.repliconHasPassword();
+  } catch (e) {
+    /* ignore */
+  }
+});
 </script>
 
 <template>
@@ -78,6 +128,32 @@ async function backupNow() {
         <button class="ghost" @click="emit('close')">Done</button>
       </header>
       <div class="body">
+        <div class="setting">
+          <label>Replicon connection</label>
+          <div class="repl-grid">
+            <input v-model="rBaseUrl" placeholder="Base URL" @change="saveR('replicon_base_url', rBaseUrl)" />
+            <input v-model="rCompany" placeholder="Company key (e.g. Enigma)" @change="saveR('replicon_company', rCompany)" />
+            <input v-model="rUsername" placeholder="Username" @change="saveR('replicon_username', rUsername)" />
+            <input
+              v-model="rPassword"
+              type="password"
+              :placeholder="rHasPw ? 'Password stored — leave blank to keep' : 'Password'"
+            />
+          </div>
+          <div class="repl-actions">
+            <button @click="savePassword">Save password</button>
+            <button @click="testRepl" :disabled="rTesting">
+              {{ rTesting ? "Testing…" : "Test connection" }}
+            </button>
+          </div>
+          <p v-if="rMsg" class="note" :class="{ 'ok-note': rOk }">{{ rMsg }}</p>
+          <pre v-if="rBody" class="repl-body mono">{{ rBody }}</pre>
+          <p class="note">
+            Password lives in your OS keychain, never the database. Read-only for now
+            (used to sync timecodes) — writing hours stays disabled until you enable it.
+          </p>
+        </div>
+
         <div class="setting">
           <label>Daily target (hours)</label>
           <input
@@ -180,5 +256,26 @@ select.narrow {
 }
 .test-btn {
   margin-top: 10px;
+}
+.repl-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.repl-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.repl-body {
+  margin: 8px 0 0;
+  padding: 8px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  max-height: 120px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 </style>

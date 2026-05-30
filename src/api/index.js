@@ -3,3 +3,4 @@ export * from "./timecodes.js";
 export * from "./entries.js";
 export * from "./settings.js";
 export * from "./system.js";
+export * from "./replicon.js";

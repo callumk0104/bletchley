@@ -50,11 +50,13 @@ pub fn fetch_entry(conn: &Connection, id: i64) -> CmdResult<TimeEntry> {
 }
 
 mod entries;
+mod replicon;
 mod settings;
 mod system;
 mod timecodes;
 
 pub use entries::*;
+pub use replicon::*;
 pub use settings::*;
 pub use system::*;
 pub use timecodes::*;
