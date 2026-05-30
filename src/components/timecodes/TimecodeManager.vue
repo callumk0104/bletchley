@@ -6,46 +6,64 @@ import { fuzzySearch } from "../../lib/fuzzy.js";
 
 const emit = defineEmits(["close"]);
 
-const client = ref("");
-const project = ref("");
-const task = ref("");
-const error = ref("");
 const filter = ref("");
-const showRetired = ref(false);
+const showHidden = ref(false);
 
+// --- Sync (Replicon is the source of truth for the code list) ---
+const syncing = ref(false);
+const syncMsg = ref("");
+const syncOk = ref(false);
+
+const hasConn = computed(
+  () =>
+    !!(
+      store.settings.replicon_base_url &&
+      store.settings.replicon_company &&
+      store.settings.replicon_username
+    )
+);
+
+const lastSync = computed(() => {
+  const v = store.settings.replicon_last_sync;
+  if (!v) return "";
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleString();
+});
+
+async function syncNow() {
+  syncing.value = true;
+  syncMsg.value = "";
+  try {
+    const res = await api.repliconSyncTimecodes();
+    syncOk.value = res.ok;
+    syncMsg.value = res.message;
+    if (res.ok) {
+      await store.saveSetting("replicon_last_sync", new Date().toISOString());
+      await Promise.all([store.loadTimecodes(), store.loadRecents()]);
+    }
+  } catch (e) {
+    syncOk.value = false;
+    syncMsg.value = String(e);
+  } finally {
+    syncing.value = false;
+  }
+}
+
+// --- Curation: hide/show codes in the picker (never touched by sync) ---
 const visible = computed(() => {
-  let list = store.timecodes;
-  if (!showRetired.value) list = list.filter((t) => t.active);
+  let list = store.timecodes.filter((t) => t.active);
+  if (!showHidden.value) list = list.filter((t) => !t.hidden);
   return fuzzySearch(filter.value, list, (t) => t.label);
 });
 
-async function addCode() {
-  error.value = "";
-  if (!client.value.trim() || !project.value.trim() || !task.value.trim()) {
-    error.value = "Client, project and task are all required.";
-    return;
-  }
-  try {
-    await api.addTimecode(client.value, project.value, task.value);
-    // Keep client/project so adding several tasks to one project is quick.
-    task.value = "";
-    await store.loadTimecodes();
-  } catch (e) {
-    error.value = String(e);
-  }
-}
-
-async function toggleActive(tc) {
-  await api.setTimecodeActive(tc.id, !tc.active);
-  await store.loadTimecodes();
-  await store.loadRecents();
-}
-
-// Datalists for quick reuse of existing clients/projects.
-const clients = computed(() => [...new Set(store.timecodes.map((t) => t.client))].sort());
-const projects = computed(() =>
-  [...new Set(store.timecodes.filter((t) => !client.value || t.client === client.value).map((t) => t.project))].sort()
+const hiddenCount = computed(
+  () => store.timecodes.filter((t) => t.active && t.hidden).length
 );
+
+async function toggleHidden(tc) {
+  await api.setTimecodeHidden(tc.id, !tc.hidden);
+  await Promise.all([store.loadTimecodes(), store.loadRecents()]);
+}
 </script>
 
 <template>
@@ -56,37 +74,41 @@ const projects = computed(() =>
         <button class="ghost" @click="emit('close')">Done</button>
       </header>
       <div class="body">
-        <div class="add-box">
-          <div class="add-fields">
-            <input v-model="client" list="clients" placeholder="Client" />
-            <input v-model="project" list="projects" placeholder="Project" />
-            <input v-model="task" placeholder="Task" @keydown.enter="addCode" />
-            <button class="primary" @click="addCode">Add code</button>
+        <div class="sync-box">
+          <div class="sync-row">
+            <button class="primary" @click="syncNow" :disabled="syncing || !hasConn">
+              {{ syncing ? "Syncing…" : "Sync from Replicon" }}
+            </button>
+            <span v-if="lastSync" class="last">Last synced {{ lastSync }}</span>
           </div>
-          <datalist id="clients">
-            <option v-for="c in clients" :key="c" :value="c" />
-          </datalist>
-          <datalist id="projects">
-            <option v-for="p in projects" :key="p" :value="p" />
-          </datalist>
-          <p v-if="error" class="err">{{ error }}</p>
+          <p v-if="!hasConn" class="note">
+            Connect Replicon in <strong>Settings</strong> first, then sync to pull your
+            bookable Client / Project / Task list.
+          </p>
+          <p v-if="syncMsg" class="note" :class="{ 'ok-note': syncOk }">{{ syncMsg }}</p>
         </div>
 
         <div class="list-head">
           <input v-model="filter" class="filter" placeholder="Filter…" />
           <label class="chk">
-            <input type="checkbox" v-model="showRetired" /> show retired
+            <input type="checkbox" v-model="showHidden" /> show hidden ({{ hiddenCount }})
           </label>
         </div>
 
         <div class="list">
-          <div v-for="tc in visible" :key="tc.id" class="trow" :class="{ off: !tc.active }">
+          <div v-for="tc in visible" :key="tc.id" class="trow" :class="{ off: tc.hidden }">
             <span class="label">{{ tc.label }}</span>
-            <button class="ghost small" @click="toggleActive(tc)">
-              {{ tc.active ? "Retire" : "Reactivate" }}
+            <button class="ghost small" @click="toggleHidden(tc)">
+              {{ tc.hidden ? "Show" : "Hide" }}
             </button>
           </div>
-          <p v-if="!visible.length" class="empty">No timecodes match.</p>
+          <p v-if="!visible.length" class="empty">
+            {{
+              store.timecodes.length
+                ? "No timecodes match."
+                : "No timecodes yet — sync from Replicon above."
+            }}
+          </p>
         </div>
       </div>
     </div>
@@ -94,26 +116,31 @@ const projects = computed(() =>
 </template>
 
 <style scoped>
-.add-box {
+.sync-box {
   background: var(--surface-2);
   border-radius: var(--radius-sm);
   padding: 12px;
   margin-bottom: 14px;
 }
-.add-fields {
+.sync-row {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 12px;
 }
-.add-fields input {
-  flex: 1;
-}
-.add-fields button {
+.sync-row button {
   white-space: nowrap;
 }
-.err {
-  color: var(--danger);
-  font-size: 13px;
+.last {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.note {
+  color: var(--text-dim);
+  font-size: 12px;
   margin: 8px 0 0;
+}
+.ok-note {
+  color: var(--ok);
 }
 .list-head {
   display: flex;

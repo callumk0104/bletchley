@@ -115,24 +115,6 @@ async function testRepl() {
   }
 }
 
-const rSyncing = ref(false);
-async function syncRepl() {
-  rSyncing.value = true;
-  rMsg.value = "";
-  rBody.value = "";
-  await persistReplFields();
-  try {
-    const res = await api.repliconSyncTimecodes();
-    rOk.value = res.ok;
-    rMsg.value = res.message;
-    if (res.ok) await store.loadTimecodes();
-  } catch (e) {
-    rOk.value = false;
-    rMsg.value = String(e);
-  } finally {
-    rSyncing.value = false;
-  }
-}
 onMounted(async () => {
   try {
     rHasPw.value = await api.repliconHasPassword();
@@ -164,19 +146,16 @@ onMounted(async () => {
           </div>
           <div class="repl-actions">
             <button @click="savePassword">Save password</button>
-            <button @click="testRepl" :disabled="rTesting || rSyncing">
+            <button @click="testRepl" :disabled="rTesting">
               {{ rTesting ? "Testing…" : "Test connection" }}
-            </button>
-            <button @click="syncRepl" :disabled="rSyncing || rTesting">
-              {{ rSyncing ? "Syncing…" : "Sync timecodes" }}
             </button>
           </div>
           <p v-if="rMsg" class="note" :class="{ 'ok-note': rOk }">{{ rMsg }}</p>
           <pre v-if="rBody" class="repl-body mono">{{ rBody }}</pre>
           <p class="note">
-            Password lives in your OS keychain, never the database. <strong>Sync timecodes</strong>
-            pulls your bookable Client / Project / Task list from Replicon (read-only) — writing
-            hours back stays disabled until you enable it.
+            Password lives in your OS keychain, never the database. Use
+            <strong>Manage codes → Sync from Replicon</strong> to pull your bookable
+            timecodes (read-only) — writing hours back stays disabled until you enable it.
           </p>
         </div>
 
