@@ -43,3 +43,7 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# --- Local updater testing (gitignored: never ship the localhost endpoint) ---
+/src-tauri/tauri.update-test.json
+/update-test/

@@ -68,3 +68,43 @@ The installer drops the app + a Start-Menu shortcut into the user profile (no
 admin needed) and registers the app identity (so notifications show as
 Bletchley). On first launch the app creates its SQLite database; timecodes are
 then pulled from Replicon via Settings → Sync timecodes.
+
+
+## Testing updates locally (no releases)
+The install step needs real `tauri build` artifacts — it can't run under
+`tauri dev` (there's no installer to hand off to). To exercise the whole
+check → download → install → relaunch loop without publishing releases:
+
+1. Put your signing key in the environment (same as a real build).
+2. Build the **"from" version** (the one that must contain the fix you're
+   testing) pointed at a local server, and install it:
+   ```powershell
+   npm run tauri build -- --config src-tauri/tauri.update-test.json
+   ```
+   `tauri.update-test.json` (gitignored) merges a `http://localhost:8080`
+   endpoint + the insecure-transport flag over the real config, so the
+   localhost endpoint never ships. Run the produced `-setup.exe` to install.
+3. Bump the version, build the **"to" version** normally (`npm run tauri build`).
+   In `src-tauri/target/release/bundle/nsis/` you'll get
+   `Bletchley_<new>_x64-setup.nsis.zip` and its `.sig`.
+4. Make an `update-test/` folder (gitignored), copy the `.nsis.zip` into it,
+   and add `latest.json`:
+   ```json
+   {
+     "version": "<new version>",
+     "notes": "local test",
+     "pub_date": "2026-01-01T00:00:00Z",
+     "platforms": {
+       "windows-x86_64": {
+         "signature": "<contents of the .nsis.zip.sig file>",
+         "url": "http://localhost:8080/Bletchley_<new>_x64-setup.nsis.zip"
+       }
+     }
+   }
+   ```
+5. Serve it: from `update-test/`, run `python -m http.server 8080`.
+6. Launch the installed "from" version. The update pill appears; clicking it
+   downloads from localhost, installs, and relaunches into the new version.
+   On Windows the app force-exits during install (installer limitation).
+
+Real builds (without `--config`) keep the GitHub HTTPS endpoint.
