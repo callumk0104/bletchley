@@ -1,6 +1,6 @@
 [package]
 name = "bletchley"
-version = "1.0.0"
+version = "1.0.1"
 description = "Friction-free timesheet capture for Replicon"
 authors = ["Callum"]
 edition = "2021"

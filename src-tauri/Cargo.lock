@@ -278,7 +278,7 @@ dependencies = [
 
 [[package]]
 name = "bletchley"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "keyring",
  "reqwest 0.12.28",

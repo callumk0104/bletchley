@@ -66,5 +66,5 @@ Output: `src-tauri/target/release/bundle/nsis/Bletchley_<version>_x64-setup.exe`
 ## How "new user setup" works
 The installer drops the app + a Start-Menu shortcut into the user profile (no
 admin needed) and registers the app identity (so notifications show as
-Bletchley). On first launch the app creates its SQLite database and seeds a
-starter set of timecodes automatically — nothing else to configure.
+Bletchley). On first launch the app creates its SQLite database; timecodes are
+then pulled from Replicon via Settings → Sync timecodes.
