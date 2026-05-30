@@ -17,6 +17,7 @@ pub fn timecode_from_row(r: &Row) -> rusqlite::Result<Timecode> {
     let project: String = r.get(2)?;
     let task: String = r.get(3)?;
     let active: i64 = r.get(4)?;
+    let hidden: i64 = r.get(5)?;
     let label = Timecode::label(&client, &project, &task);
     Ok(Timecode {
         id: r.get(0)?,
@@ -24,6 +25,7 @@ pub fn timecode_from_row(r: &Row) -> rusqlite::Result<Timecode> {
         project,
         task,
         active: active != 0,
+        hidden: hidden != 0,
         label,
     })
 }

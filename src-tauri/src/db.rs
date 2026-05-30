@@ -16,6 +16,8 @@ pub fn init(path: &Path) -> rusqlite::Result<Connection> {
             project TEXT NOT NULL,
             task    TEXT NOT NULL,
             active  INTEGER NOT NULL DEFAULT 1,
+            -- user curation, never touched by sync: hide from the picker
+            hidden  INTEGER NOT NULL DEFAULT 0,
             -- 'local' = hand-added, 'replicon' = synced from Replicon
             source  TEXT NOT NULL DEFAULT 'local',
             billing TEXT,
@@ -55,6 +57,7 @@ pub fn init(path: &Path) -> rusqlite::Result<Connection> {
 /// migration as long as we only add columns that aren't already present.
 fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     let additions: &[(&str, &str)] = &[
+        ("hidden", "hidden INTEGER NOT NULL DEFAULT 0"),
         ("source", "source TEXT NOT NULL DEFAULT 'local'"),
         ("billing", "billing TEXT"),
         ("replicon_client_uri", "replicon_client_uri TEXT"),

@@ -30,7 +30,7 @@ export const store = reactive({
   async loadTimecodes() {
     const all = await api.listTimecodes(false);
     this.timecodes = all;
-    this.activeTimecodes = all.filter((t) => t.active);
+    this.activeTimecodes = all.filter((t) => t.active && !t.hidden);
     this.byId = Object.fromEntries(all.map((t) => [t.id, t]));
   },
 

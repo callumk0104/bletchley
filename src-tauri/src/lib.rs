@@ -128,6 +128,7 @@ pub fn run() {
             commands::list_timecodes,
             commands::add_timecode,
             commands::set_timecode_active,
+            commands::set_timecode_hidden,
             commands::recent_timecodes,
             commands::add_entry,
             commands::update_entry,

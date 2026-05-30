@@ -10,6 +10,7 @@ pub struct Timecode {
     pub project: String,
     pub task: String,
     pub active: bool,
+    pub hidden: bool,
     pub label: String,
 }
 
