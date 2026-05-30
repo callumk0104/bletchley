@@ -16,11 +16,12 @@ function setTheme(v) {
   store.saveSetting("theme", v);
 }
 
-const updateTitle = computed(() =>
-  updateState.downloading
+const updateTitle = computed(() => {
+  if (updateState.error) return `Update failed: ${updateState.error} — click to retry`;
+  return updateState.downloading
     ? `Downloading ${updateState.progress}%…`
-    : `Version ${updateState.version} is available — click to update and restart`
-);
+    : `Version ${updateState.version} is available — click to update and restart`;
+});
 </script>
 
 <template>
@@ -30,12 +31,14 @@ const updateTitle = computed(() =>
       <button
         v-if="updateState.available"
         class="update-pill"
+        :class="{ failed: updateState.error && !updateState.downloading }"
         :disabled="updateState.downloading"
         :title="updateTitle"
         @click="installUpdate"
       >
         <span class="dot"></span>
         <span v-if="updateState.downloading">Updating {{ updateState.progress }}%</span>
+        <span v-else-if="updateState.error">Update failed — retry</span>
         <span v-else>Update to {{ updateState.version }}</span>
       </button>
     </div>
@@ -124,6 +127,13 @@ const updateTitle = computed(() =>
   height: 6px;
   border-radius: 50%;
   background: var(--accent);
+}
+.update-pill.failed {
+  background: color-mix(in srgb, var(--danger, #d9534f) 18%, transparent);
+  color: var(--danger, #d9534f);
+}
+.update-pill.failed .dot {
+  background: var(--danger, #d9534f);
 }
 .right {
   display: flex;
