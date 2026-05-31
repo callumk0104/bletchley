@@ -3,13 +3,35 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import { store } from "../../store/index.js";
 import * as api from "../../api/index.js";
 import { parseDuration, formatDuration } from "../../lib/duration.js";
-import { isoDate, startOfWeek, weekDays } from "../../lib/dates.js";
+import { isoDate, startOfWeek, weekDays, addDays, weekRangeLabel } from "../../lib/dates.js";
 import TimecodePicker from "../common/TimecodePicker.vue";
 
 const emit = defineEmits(["open-codes"]);
 
 const selected = ref(null); // timecode object or null (blank = unresolved)
-const date = ref(isoDate(new Date()));
+
+// Week navigation: the shown week (Monday) + which weekday is selected (0..4),
+// so you can log to past/other weeks, not just today.
+const weekStart = ref(startOfWeek(new Date()));
+const _todayIso = isoDate(new Date());
+const _initIdx = weekDays(weekStart.value).findIndex((d) => d.iso === _todayIso);
+const dayIdx = ref(_initIdx >= 0 ? _initIdx : 4); // weekends default to Friday
+const date = computed(() => days.value[dayIdx.value]?.iso ?? _todayIso);
+const isThisWeek = computed(
+  () => isoDate(weekStart.value) === isoDate(startOfWeek(new Date()))
+);
+function prevWeek() {
+  weekStart.value = addDays(weekStart.value, -7);
+}
+function nextWeek() {
+  weekStart.value = addDays(weekStart.value, 7);
+}
+function thisWeek() {
+  const wk = startOfWeek(new Date());
+  weekStart.value = wk;
+  const i = weekDays(wk).findIndex((d) => d.iso === isoDate(new Date()));
+  dayIdx.value = i >= 0 ? i : 4;
+}
 const description = ref("");
 const durationText = ref("");
 const error = ref("");
@@ -19,8 +41,8 @@ const picker = ref(null);
 const descEl = ref(null);
 const durEl = ref(null);
 
-// Day chips for the current week so you can log to any weekday quickly.
-const days = computed(() => weekDays(startOfWeek(new Date())));
+// Day chips for the selected week so you can log to any weekday quickly.
+const days = computed(() => weekDays(weekStart.value));
 
 const parsedMinutes = computed(() => parseDuration(durationText.value));
 const durationPreview = computed(() =>
@@ -138,19 +160,34 @@ async function undo(entry, i) {
 <template>
   <div class="capture">
     <div class="card">
-      <!-- Day selector -->
+      <!-- Week navigation + day selector -->
+      <div class="week-nav">
+        <button class="ghost wk" title="Previous week" @click="prevWeek">‹</button>
+        <button
+          class="ghost wk-label"
+          :class="{ past: !isThisWeek }"
+          :title="isThisWeek ? 'Current week' : 'Back to this week'"
+          @click="thisWeek"
+        >
+          {{ isThisWeek ? "This week" : weekRangeLabel(weekStart) }}
+        </button>
+        <button class="ghost wk" title="Next week" @click="nextWeek">›</button>
+      </div>
       <div class="days">
         <button
-          v-for="d in days"
+          v-for="(d, i) in days"
           :key="d.iso"
           class="day"
-          :class="{ on: date === d.iso }"
-          @click="date = d.iso"
+          :class="{ on: dayIdx === i }"
+          @click="dayIdx = i"
         >
           <span class="dow">{{ d.label }}</span>
           <span class="dnum">{{ d.dayNum }}</span>
         </button>
       </div>
+      <p v-if="!isThisWeek" class="offweek">
+        ⚠ Logging to {{ weekRangeLabel(weekStart) }} — not the current week.
+      </p>
 
       <!-- Timecode -->
       <label class="field-label">Timecode</label>
@@ -238,10 +275,36 @@ async function undo(entry, i) {
   border-radius: var(--radius);
   padding: 18px;
 }
+.week-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.wk {
+  padding: 4px 10px;
+  font-size: 14px;
+  line-height: 1;
+}
+.wk-label {
+  font-weight: 600;
+  font-size: 12px;
+  min-width: 110px;
+}
+.wk-label.past {
+  background: var(--warn-soft);
+  color: var(--warn);
+  border-color: transparent;
+}
 .days {
   display: flex;
   gap: 6px;
   margin-bottom: 16px;
+}
+.offweek {
+  color: var(--warn);
+  font-size: 12px;
+  margin: -8px 0 14px 2px;
 }
 .day {
   display: flex;
