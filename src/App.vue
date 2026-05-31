@@ -2,12 +2,15 @@
 import { ref, onMounted } from "vue";
 import { store } from "./store/index.js";
 import { startEodWatcher } from "./composables/useEodReminder.js";
-import { checkForUpdate } from "./composables/useUpdater.js";
+import { checkForUpdate, updateState } from "./composables/useUpdater.js";
 import QuickCapture from "./components/capture/QuickCapture.vue";
 import WeeklyGrid from "./components/grid/WeeklyGrid.vue";
 import UnresolvedTray from "./components/timecodes/UnresolvedTray.vue";
 import TimecodeManager from "./components/timecodes/TimecodeManager.vue";
 import Settings from "./components/settings/Settings.vue";
+import SearchEntries from "./components/search/SearchEntries.vue";
+import WhatsNew from "./components/layout/WhatsNew.vue";
+import UpdatePrompt from "./components/layout/UpdatePrompt.vue";
 import TotalsBar from "./components/layout/TotalsBar.vue";
 import WindowControls from "./components/layout/WindowControls.vue";
 import QuickAddMini from "./components/capture/QuickAddMini.vue";
@@ -22,7 +25,11 @@ const tab = ref("capture"); // 'capture' | 'grid'
 const showTray = ref(false);
 const showManager = ref(false);
 const showSettings = ref(false);
+const showSearch = ref(false);
 const showAbout = ref(false);
+const showWhatsNew = ref(false);
+const showUpdate = ref(false);
+const checkMsg = ref("");
 const menu = ref({ open: false, x: 0, y: 0 });
 const ready = ref(false);
 
@@ -35,6 +42,20 @@ function closeMenu() {
 
 function refreshOnFocus() {
   store.refreshAll();
+}
+
+async function manualCheck() {
+  checkMsg.value = "Checking…";
+  await checkForUpdate();
+  if (updateState.available) {
+    checkMsg.value = "";
+    showUpdate.value = true;
+  } else {
+    checkMsg.value = updateState.error
+      ? "Couldn't check for updates."
+      : "You're on the latest version.";
+    setTimeout(() => (checkMsg.value = ""), 2600);
+  }
 }
 
 onMounted(async () => {
@@ -73,6 +94,7 @@ onMounted(async () => {
           <span v-if="store.unresolved.length">⚠ {{ store.unresolved.length }}</span>
           <span v-else class="quiet">✓</span>
         </button>
+        <button class="ghost" title="Search entries" @click="showSearch = true">🔍</button>
         <button class="ghost" @click="showManager = true">Timecodes</button>
         <button class="ghost" title="Settings" @click="showSettings = true">⚙</button>
       </div>
@@ -85,12 +107,16 @@ onMounted(async () => {
     </main>
     <main v-else class="loading">Loading…</main>
 
-    <StatusBar v-if="ready" />
+    <StatusBar v-if="ready" @open-update="showUpdate = true" />
 
     <UnresolvedTray v-if="showTray" @close="showTray = false" />
     <TimecodeManager v-if="showManager" @close="showManager = false" />
     <Settings v-if="showSettings" @close="showSettings = false" />
+    <SearchEntries v-if="showSearch" @close="showSearch = false" />
     <About v-if="showAbout" @close="showAbout = false" />
+    <WhatsNew v-if="showWhatsNew" @close="showWhatsNew = false" />
+    <UpdatePrompt v-if="showUpdate" @close="showUpdate = false" />
+    <div v-if="checkMsg" class="toast">{{ checkMsg }}</div>
 
     <div
       v-if="menu.open"
@@ -99,8 +125,9 @@ onMounted(async () => {
       @contextmenu.prevent="closeMenu"
     >
       <div class="ctx-menu" :style="{ top: menu.y + 'px', left: menu.x + 'px' }" @click.stop>
+        <button @click="showWhatsNew = true; closeMenu()">What's new</button>
         <button @click="showAbout = true; closeMenu()">About Bletchley</button>
-        <button @click="checkForUpdate(); closeMenu()">Check for updates</button>
+        <button @click="manualCheck(); closeMenu()">Check for updates</button>
       </div>
     </div>
   </div>
@@ -208,5 +235,18 @@ main {
 .ctx-menu button:hover {
   background: var(--accent-soft);
   color: var(--accent);
+}
+.toast {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  padding: 8px 16px;
+  font-size: 13px;
+  z-index: 80;
 }
 </style>

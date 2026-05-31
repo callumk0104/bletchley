@@ -1,7 +1,9 @@
 <script setup>
 import { computed } from "vue";
 import { store } from "../../store/index.js";
-import { updateState, installUpdate } from "../../composables/useUpdater.js";
+import { updateState } from "../../composables/useUpdater.js";
+
+const emit = defineEmits(["open-update"]);
 
 // Injected at build time from package.json (see vite.config.js).
 const version = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
@@ -34,7 +36,7 @@ const updateTitle = computed(() => {
         :class="{ failed: updateState.error && !updateState.downloading }"
         :disabled="updateState.downloading"
         :title="updateTitle"
-        @click="installUpdate"
+        @click="emit('open-update')"
       >
         <span class="dot"></span>
         <span v-if="updateState.downloading">Updating {{ updateState.progress }}%</span>
