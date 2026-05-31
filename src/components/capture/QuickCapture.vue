@@ -6,6 +6,8 @@ import { parseDuration, formatDuration } from "../../lib/duration.js";
 import { isoDate, startOfWeek, weekDays } from "../../lib/dates.js";
 import TimecodePicker from "../common/TimecodePicker.vue";
 
+const emit = defineEmits(["open-codes"]);
+
 const selected = ref(null); // timecode object or null (blank = unresolved)
 const date = ref(isoDate(new Date()));
 const description = ref("");
@@ -30,8 +32,12 @@ onMounted(() => {
   // Sticky default to the last-used timecode.
   if (store.lastUsedId != null && store.byId[store.lastUsedId]) {
     selected.value = store.byId[store.lastUsedId];
+    nextFocus(descEl); // a chip is shown, not the picker — go straight to typing
+  } else if (store.activeTimecodes.length) {
+    picker.value?.focus?.();
+  } else {
+    nextFocus(descEl); // no codes yet; let them capture to the tray
   }
-  picker.value?.focus?.();
 });
 
 function onSelectTimecode(tc) {
@@ -151,6 +157,10 @@ async function undo(entry, i) {
       <div v-if="selected" class="chip-row">
         <span class="chip">{{ selected.label }}</span>
         <button class="ghost small" @click="clearTimecode">change</button>
+      </div>
+      <div v-else-if="!store.activeTimecodes.length" class="tc-empty">
+        <span>No timecodes yet — connect Replicon and sync to pull your bookable codes.</span>
+        <button class="ghost small" @click="emit('open-codes')">Set up timecodes</button>
       </div>
       <TimecodePicker
         v-else
@@ -275,6 +285,20 @@ async function undo(entry, i) {
   padding: 9px 12px;
   border-radius: var(--radius-sm);
   flex: 1;
+}
+.tc-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.tc-empty button {
+  white-space: nowrap;
 }
 .small {
   padding: 4px 9px;

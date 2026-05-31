@@ -67,19 +67,20 @@ onMounted(async () => {
         <button
           class="ghost tray-btn"
           :class="{ alert: store.unresolved.length }"
+          :title="store.unresolved.length ? store.unresolved.length + ' need a timecode' : 'Nothing needs a timecode'"
           @click="showTray = true"
         >
-          ⚠ <span v-if="store.unresolved.length">{{ store.unresolved.length }}</span>
-          <span v-else>0</span>
+          <span v-if="store.unresolved.length">⚠ {{ store.unresolved.length }}</span>
+          <span v-else class="quiet">✓</span>
         </button>
-        <button class="ghost" @click="showManager = true">Manage codes</button>
+        <button class="ghost" @click="showManager = true">Timecodes</button>
         <button class="ghost" title="Settings" @click="showSettings = true">⚙</button>
       </div>
       <WindowControls />
     </header>
 
     <main v-if="ready">
-      <QuickCapture v-show="tab === 'capture'" />
+      <QuickCapture v-show="tab === 'capture'" @open-codes="showManager = true" />
       <WeeklyGrid v-if="tab === 'grid'" @open-tray="showTray = true" />
     </main>
     <main v-else class="loading">Loading…</main>
@@ -166,6 +167,9 @@ onMounted(async () => {
   color: var(--warn);
   border-color: transparent;
   font-weight: 700;
+}
+.tray-btn .quiet {
+  color: var(--ok);
 }
 main {
   flex: 1;
