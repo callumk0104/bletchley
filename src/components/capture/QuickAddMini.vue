@@ -109,7 +109,7 @@ async function add() {
         v-else
         ref="picker"
         :recents="store.recents"
-        placeholder="Timecode…  (Esc to close)"
+        placeholder="Timecode (optional) — Esc to dismiss"
         @select="pick"
       />
     </div>

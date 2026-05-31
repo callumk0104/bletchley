@@ -5,7 +5,7 @@ import { fuzzySearch } from "../../lib/fuzzy.js";
 
 const props = defineProps({
   recents: { type: Array, default: () => [] },
-  placeholder: { type: String, default: "Search timecode…  (try \"chevqa\")" },
+  placeholder: { type: String, default: "Search timecode…" },
   autofocus: { type: Boolean, default: false },
 });
 const emit = defineEmits(["select"]);
@@ -101,6 +101,16 @@ function onInput() {
   nextTick(positionDropdown);
 }
 
+// Esc should dismiss the open dropdown without bubbling to any window-level
+// handler (e.g. the quick-add popup's "Esc hides the window"). Only when the
+// dropdown is already closed do we let Esc through to close the window.
+function onEsc(e) {
+  if (open.value) {
+    open.value = false;
+    e.stopPropagation();
+  }
+}
+
 function onKeydown(e) {
   if (showRecents.value && /^[1-9]$/.test(e.key)) {
     const idx = Number(e.key) - 1;
@@ -116,7 +126,7 @@ if (props.autofocus) nextTick(focus);
 
 <template>
   <div class="picker" @keydown.down.prevent="move(1)" @keydown.up.prevent="move(-1)"
-       @keydown.enter.prevent="onEnter" @keydown.esc="open = false">
+       @keydown.enter.prevent="onEnter" @keydown.esc="onEsc">
     <input
       ref="inputEl"
       v-model="query"
