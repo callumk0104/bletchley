@@ -53,6 +53,10 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec!["--minimized"]),
+        ))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
@@ -122,6 +126,44 @@ pub fn run() {
                 Err(e) => eprintln!("Invalid hotkey '{hotkey}': {e}"),
             }
 
+            // --- Close-to-tray: hide the window instead of quitting (unless the
+            // user turned it off), so the hotkey and reminders keep working. ---
+            let handle = app.handle().clone();
+            if let Some(main) = app.get_webview_window("main") {
+                main.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        let keep = (|| {
+                            let st = handle.try_state::<AppState>()?;
+                            let conn = st.conn.lock().ok()?;
+                            let v: String = conn
+                                .query_row(
+                                    "SELECT value FROM setting WHERE key = 'close_to_tray'",
+                                    [],
+                                    |r| r.get(0),
+                                )
+                                .ok()?;
+                            Some(v != "0")
+                        })()
+                        .unwrap_or(true);
+                        if keep {
+                            api.prevent_close();
+                            if let Some(w) = handle.get_webview_window("main") {
+                                let _ = w.hide();
+                            }
+                        } else {
+                            handle.exit(0);
+                        }
+                    }
+                });
+            }
+
+            // Launched at login with `--minimized`: start hidden in the tray.
+            if std::env::args().any(|a| a == "--minimized") {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.hide();
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -135,12 +177,15 @@ pub fn run() {
             commands::delete_entry,
             commands::entries_for_week,
             commands::unresolved_entries,
+            commands::search_entries,
             commands::totals,
             commands::get_settings,
             commands::set_setting,
             commands::backup_now,
             commands::backups_path,
             commands::update_tray,
+            commands::autostart_is_enabled,
+            commands::autostart_set,
             commands::replicon_set_password,
             commands::replicon_has_password,
             commands::replicon_test_connection,

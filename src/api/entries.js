@@ -13,5 +13,8 @@ export const entriesForWeek = (weekStart, weekEnd) =>
 
 export const unresolvedEntries = () => invoke("unresolved_entries");
 
+export const searchEntries = (query, limit = 200) =>
+  invoke("search_entries", { query, limit });
+
 export const totals = (today, weekStart, weekEnd) =>
   invoke("totals", { today, weekStart, weekEnd });

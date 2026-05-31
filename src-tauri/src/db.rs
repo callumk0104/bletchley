@@ -95,6 +95,8 @@ fn seed_default_settings(conn: &Connection) -> rusqlite::Result<()> {
         ("eod_reminder_enabled", "0"),
         ("eod_reminder_time", "17:00"),
         ("hotkey", "CmdOrCtrl+Shift+Space"),
+        ("close_to_tray", "1"),
+        ("sync_on_startup", "1"),
     ];
     let mut stmt =
         conn.prepare("INSERT OR IGNORE INTO setting (key, value) VALUES (?1, ?2)")?;

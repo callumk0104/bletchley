@@ -49,6 +49,36 @@ function saveHotkey() {
   store.saveSetting("hotkey", hotkey.value.trim());
 }
 
+// --- Startup & window ---
+const closeToTray = computed({
+  get: () => store.settings.close_to_tray !== "0",
+  set: (v) => store.saveSetting("close_to_tray", v ? "1" : "0"),
+});
+const syncOnStartup = computed({
+  get: () => store.settings.sync_on_startup !== "0",
+  set: (v) => store.saveSetting("sync_on_startup", v ? "1" : "0"),
+});
+const autostart = ref(false);
+const autostartBusy = ref(false);
+async function setAutostart(v) {
+  autostartBusy.value = true;
+  try {
+    await api.autostartSet(v);
+    autostart.value = await api.autostartIsEnabled();
+  } catch (e) {
+    /* ignore */
+  } finally {
+    autostartBusy.value = false;
+  }
+}
+onMounted(async () => {
+  try {
+    autostart.value = await api.autostartIsEnabled();
+  } catch (e) {
+    /* ignore */
+  }
+});
+
 // Backups
 const backupsDir = ref("");
 const backupMsg = ref("");
@@ -207,6 +237,30 @@ onMounted(async () => {
         </div>
 
         <div class="setting">
+          <label>Startup &amp; window</label>
+          <div class="opts">
+            <label class="opt">
+              <input
+                type="checkbox"
+                :checked="autostart"
+                :disabled="autostartBusy"
+                @change="setAutostart($event.target.checked)"
+              />
+              Start Bletchley on login (launches hidden in the tray)
+            </label>
+            <label class="opt">
+              <input type="checkbox" v-model="closeToTray" />
+              Keep running in the tray when the window is closed
+            </label>
+            <label class="opt">
+              <input type="checkbox" v-model="syncOnStartup" />
+              Sync timecodes from Replicon on startup (once a day)
+            </label>
+          </div>
+          <p class="note">Quit fully from the tray icon\u2019s right-click menu.</p>
+        </div>
+
+        <div class="setting">
           <label>Data &amp; backups</label>
           <button @click="backupNow">Back up now</button>
           <p class="note">
@@ -261,6 +315,21 @@ select.narrow {
 }
 .test-btn {
   margin-top: 10px;
+}
+.opts {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.opt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--text);
+}
+.opt input {
+  width: auto;
 }
 .repl-grid {
   display: grid;

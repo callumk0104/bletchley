@@ -97,6 +97,37 @@ pub fn unresolved_entries(state: State<AppState>) -> CmdResult<Vec<TimeEntry>> {
     rows.collect::<rusqlite::Result<Vec<_>>>().map_err(err)
 }
 
+/// Search across all entries: matches the description or any part of the
+/// timecode label (client / project / task). An empty query returns the most
+/// recent entries (browse mode). Newest first, capped by `limit`.
+#[tauri::command]
+pub fn search_entries(
+    state: State<AppState>,
+    query: String,
+    limit: i64,
+) -> CmdResult<Vec<TimeEntry>> {
+    let q = query.trim().to_string();
+    let like = format!("%{}%", q);
+    let lim = if limit > 0 { limit } else { 200 };
+    let conn = state.conn.lock().map_err(err)?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT e.id, e.timecode_id, e.date, e.duration_minutes, e.description, e.created_at \
+             FROM time_entry e \
+             LEFT JOIN timecode t ON t.id = e.timecode_id \
+             WHERE ?1 = '' \
+                OR e.description LIKE ?2 \
+                OR t.client LIKE ?2 OR t.project LIKE ?2 OR t.task LIKE ?2 \
+             ORDER BY e.date DESC, e.created_at DESC \
+             LIMIT ?3",
+        )
+        .map_err(err)?;
+    let rows = stmt
+        .query_map(params![q, like, lim], entry_from_row)
+        .map_err(err)?;
+    rows.collect::<rusqlite::Result<Vec<_>>>().map_err(err)
+}
+
 /// Logged minutes for a single day and for the whole week — powers the
 /// always-visible totals strip.
 #[derive(Serialize)]

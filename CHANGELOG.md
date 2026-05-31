@@ -10,6 +10,8 @@ matching section into the GitHub release notes, and the app shows it under
 - Capture time to past or future weeks, not just the current one.
 - Search past entries by description or timecode, with inline editing.
 - "What's new" — view release notes from the menu and when an update is available.
+- Runs in the background: start on login, keep running in the tray when the window
+  is closed, and an optional once-a-day automatic timecode sync on startup.
 
 ### Changed
 - The Timecodes view is now the home for Replicon sync, with a hide/show toggle

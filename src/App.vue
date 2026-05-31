@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { store } from "./store/index.js";
+import * as api from "./api/index.js";
 import { startEodWatcher } from "./composables/useEodReminder.js";
 import { checkForUpdate, updateState } from "./composables/useUpdater.js";
 import QuickCapture from "./components/capture/QuickCapture.vue";
@@ -44,6 +45,24 @@ function refreshOnFocus() {
   store.refreshAll();
 }
 
+async function maybeAutoSync() {
+  const s = store.settings;
+  if (s.sync_on_startup === "0") return;
+  if (!(s.replicon_base_url && s.replicon_company && s.replicon_username)) return;
+  const last = s.replicon_last_sync ? new Date(s.replicon_last_sync) : null;
+  if (last && last.toDateString() === new Date().toDateString()) return; // already synced today
+  try {
+    if (!(await api.repliconHasPassword())) return;
+    const res = await api.repliconSyncTimecodes();
+    if (res.ok) {
+      await store.saveSetting("replicon_last_sync", new Date().toISOString());
+      await store.loadTimecodes();
+    }
+  } catch (e) {
+    /* silent — the manual Sync button in Timecodes is still there */
+  }
+}
+
 async function manualCheck() {
   checkMsg.value = "Checking…";
   await checkForUpdate();
@@ -64,6 +83,7 @@ onMounted(async () => {
   ready.value = true;
   startEodWatcher();
   checkForUpdate(); // silent; surfaces in the status bar if an update exists
+  maybeAutoSync(); // once-a-day background timecode refresh if connected
   // Pick up entries added from the quick window when returning to the app.
   window.addEventListener("focus", refreshOnFocus);
 });
