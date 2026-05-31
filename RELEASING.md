@@ -35,17 +35,22 @@ https://github.com/<owner>/<repo>/releases/latest/download/latest.json
 
 ## Cutting a release
 
-1. Bump the version in **both** `package.json` and `src-tauri/tauri.conf.json`
+1. **Update the changelog.** In `CHANGELOG.md`, rename `## [Unreleased]` to
+   `## [x.y.z] - YYYY-MM-DD` and start a fresh empty `## [Unreleased]` above it.
+   Keep entries short and user-facing (Added / Changed / Fixed). The workflow
+   pulls this section into the GitHub release notes, and the app shows it under
+   "What's new".
+2. Bump the version in **both** `package.json` and `src-tauri/tauri.conf.json`
    (e.g. `0.2.0`). They should always match — the status-bar version reads
    `package.json`; the updater compares against `tauri.conf.json`.
-2. Commit, then tag and push:
+3. Commit, then tag and push:
    ```bash
    git tag v0.2.0
    git push origin v0.2.0
    ```
-3. The **Release** GitHub Action builds + signs the installer and a signed
+4. The **Release** GitHub Action builds + signs the installer and a signed
    updater bundle, and creates a **draft** release with `latest.json`.
-4. Open the release on GitHub and **Publish** it.
+5. Open the release on GitHub and **Publish** it.
 
 That's it. Running apps check `latest.json` on startup; when a newer signed
 version exists, the status bar shows an "Update to x.y.z" pill that downloads,

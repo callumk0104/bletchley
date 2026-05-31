@@ -24,6 +24,10 @@ jobs:
       - name: Install frontend deps
         run: npm install
 
+      - name: Release notes from CHANGELOG
+        id: notes
+        run: node .github/extract-notes.mjs ${{ github.ref_name }}
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -33,7 +37,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Bletchley ${{ github.ref_name }}"
-          releaseBody: "Download the `-setup.exe` to install. Existing installs update automatically."
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
